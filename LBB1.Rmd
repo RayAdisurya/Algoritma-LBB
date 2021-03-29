@@ -1,0 +1,164 @@
+---
+title: "LBB1"
+author: "Ray"
+date: "3/23/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+getwd()
+```
+
+```{r}
+library(dplyr)
+library(readr)
+```
+
+# DATA INPUT & CLEANSING
+
+```{r}
+retail <- read.csv(file = "data/retail.csv")
+```
+
+```{r}
+head(retail)
+```
+
+```{r}
+# Check data types
+
+str(retail)
+```
+It is found that some data type is not suitable. So let's change them into the correct type.
+
+```{r}
+# Change into suitable data type
+
+retail$Order.Date<- as.Date(retail$Order.Date, "%m/%d/%y")
+retail$Ship.Date <- as.Date(retail$Ship.Date, "%m/%d/%y")
+retail$Ship.Mode <- as.factor(retail$Ship.Mode)
+retail$Segment <- as.factor(retail$Segment)
+retail$Category <- as.factor(retail$Category)
+retail$Sub.Category <- as.factor(retail$Sub.Category)
+
+str(retail)
+```
+
+```{r}
+# Check for missing value
+
+colSums(is.na(retail))
+```
+Since we are not using the first 2 columns, we can just ignore it for now.
+
+```{r}
+# Ignore first 2 columns
+
+retail <- retail[ ,c(3:15)]
+head(retail)
+```
+
+```{r}
+summary(retail)
+```
+Summary:
+
+1. Our data covers the sales from January 2014 to December 2017, totaling 9994 sales
+2. Standard class is the most popular shipping option while same day delivery was the lowest
+3. Most sales came from the consumer segment, followed by corporate and home office segment
+4. Most sales are from office supply category
+5. The business is still profitable based on the mean profit of 28.657
+
+```{r}
+levels(retail$Sub.Category)
+```
+We will be using subcategory instead of category as it is more specific.
+
+# DATA MANIPULATION & TRANSFORMATION
+
+## PROFITABILITY ANALYSIS
+
+1. Which segment is the most profitable? How many is the sales count?
+
+```{r}
+retail %>%
+  group_by(Segment) %>%
+  summarise(Total_Profit = round(sum(Profit), 2),
+            Count = n(),
+            Mean_Profit = round(mean(Profit), 2)) %>%
+  arrange(-Total_Profit)
+```
+The business' main customers are the consumer segments. While it has the lowest average profit per sale, the sheer quantity of their sales turns them into the most profitable segment.
+
+The corporate segment ranks second onall three measurements. The home office segment produces the most profit on average. However, it also has the lowest sales count, making them the least profitable of the three.
+
+2. Is there any subcategory that experience losses? If there is, how many is the sales count?
+
+3. How prevalent are discounts from each subcategory?
+
+```{r}
+retail %>%
+  group_by(Sub.Category) %>%
+  summarise(Mean_Discount = round(mean(Discount), 4),
+            Count = n(),
+            Mean_Profit = round(mean(Profit), 2)) %>%
+  arrange(-Mean_Discount)
+```
+Binders, machines, and tables are the 3 subcategories in which the given discounts are quite generous.
+
+We can see that supplies, tables, and bookcases do have negative mean profits. Thankfully, their sales count is comparatively low as well. It is recommended for the retailer to reconsider selling tables since it produces the most losses on average.
+
+Reducing the discount on tables may or may not help its profits however, since customers can simply look for alternatives if no discounts are offered.
+
+```{r}
+retail %>%
+  group_by(Discount) %>%
+  summarise(Count = n()) %>%
+  mutate("Prevalence_%" = round(Count / 9994 * 100, 2)) %>%
+  arrange(-Discount)
+```
+The business offers 20% discounts 36.59% of the time it made a sale. 48.01% of sales are made without discounts.
+
+```{r}
+retail %>%
+  filter(Discount == 0.8) %>%
+  group_by(Sub.Category) %>%
+  summarise(Count = n()) %>%
+  arrange(-Count)
+```
+It can be seen that there are a lot of 80% discounts on binders, the subcategory with the highest sales count. Even though reducing the discounts can seemingly increase the profits gained, it may not be wise to do so. It is possible that by reducing the discounts, the sales count will also decrease, making the point moot. Further market research is advised.
+
+## SHIPPING MODE ANALYSIS
+
+4. Which shipping mode is the most popular?
+
+```{r}
+xtabs( ~ Segment + Ship.Mode, retail)
+```
+
+```{r}
+plot(xtabs( ~ Segment + Ship.Mode, retail))
+```
+
+```{r}
+heatmap(xtabs( ~ Segment + Ship.Mode, retail))
+```
+
+```{r}
+round(prop.table(table(retail$Segment, retail$Ship.Mode)) * 100, 2)
+```
+Standard class is the most popular shipping mode across all segments. Almost 31% of all sales are made to the consumer segment using standard class shipping.
+
+```{r}
+retail %>%
+  group_by(Ship.Mode) %>%
+  summarise(Total_Sales = round(sum(Sales), 2),
+            Mean_Sales = round(mean(Sales), 2),
+            Sales_Count = n()) %>%
+  arrange(-Sales_Count)
+```
+As expected, most of the sales volume are in the standard class, which also makes up the majority of the shipping mode used. Also worth noting is that the average value of an item sold does not vary wildly between the shipping modes.
